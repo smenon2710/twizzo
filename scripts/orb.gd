@@ -6,9 +6,14 @@ const RADIUS: float = 45.0
 var color: Color = Color.WHITE
 
 func _draw() -> void:
+	# flat saturated fill — no gradient/shading, reads instantly at a glance
 	draw_circle(Vector2.ZERO, RADIUS, color)
-	draw_arc(Vector2.ZERO, RADIUS - 1.5, 0.0, TAU, 32, color.darkened(0.4), 3.0)
-	draw_circle(Vector2(-RADIUS * 0.3, -RADIUS * 0.3), RADIUS * 0.22, color.lightened(0.55))
+
+	# thick clean cartoon-sticker outline
+	draw_arc(Vector2.ZERO, RADIUS - 3.0, 0.0, TAU, 40, Color(0.08, 0.08, 0.1), 6.0)
+
+	# single small clean gloss dot — friendly, not a heavy 3D specular
+	draw_circle(Vector2(-RADIUS * 0.32, -RADIUS * 0.32), RADIUS * 0.16, Color(1, 1, 1, 0.85))
 
 func set_orb_color(c: Color) -> void:
 	color = c

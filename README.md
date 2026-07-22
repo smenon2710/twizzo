@@ -36,6 +36,12 @@ This README tracks what's actually been built so far.
   a red line marking the lose boundary.
 - **Instant retry** — tap/click after a win or loss reloads the level
   immediately (win advances to the next level; loss retries the same one).
+- **Visual identity** — vivid saturated palette (red/blue/green/yellow/purple)
+  with a flat "cartoon-sticker" render style (thick dark outline, flat fill,
+  single clean gloss dot) instead of a glossy 3D-sphere look. Chosen over an
+  earlier muted "ceramic bead" direction, which tested as too dull for a
+  kid/young-audience target — see Section 10.3 of the game plan on audience
+  and Families Policy considerations.
 - Configured for mobile: Forward Mobile renderer, 720×1280 portrait lock.
 
 ### Not yet implemented (see game plan Section 9 / 6)

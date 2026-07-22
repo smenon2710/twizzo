@@ -12,11 +12,11 @@ const TOP_MARGIN: float = 80.0
 const LOSE_ROW: int = 11
 
 const COLORS: Array[Color] = [
-	Color(0.90, 0.25, 0.30), # red
-	Color(0.25, 0.55, 0.95), # blue
-	Color(0.30, 0.80, 0.40), # green
-	Color(0.95, 0.80, 0.20), # yellow
-	Color(0.65, 0.35, 0.85), # purple
+	Color(0.95, 0.18, 0.22), # red
+	Color(0.15, 0.55, 0.98), # blue
+	Color(0.20, 0.82, 0.35), # green
+	Color(1.00, 0.82, 0.10), # yellow
+	Color(0.68, 0.25, 0.92), # purple
 ]
 
 var board_width: float = COLS_EVEN * DIAMETER
