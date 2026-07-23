@@ -8,16 +8,52 @@ var level_index: int = 0
 # Persisted to disk; loaded on startup, saved whenever a level is cleared.
 var best_stars: Dictionary = {}
 
+# Daily streak: consecutive calendar days played. Missing exactly one day
+# doesn't reset it (a 1-day "grace") — missing two or more does.
+var streak_count: int = 0
+var last_play_date: String = ""
+var streak_in_grace: bool = false
+
 func _ready() -> void:
 	load_progress()
+	_update_streak()
 
 func is_level_unlocked(index: int) -> bool:
 	if index == 0:
 		return true
 	return best_stars.has(index - 1)
 
+func _update_streak() -> void:
+	var today: String = Time.get_date_string_from_system()
+	if last_play_date == today:
+		pass
+	elif last_play_date == "":
+		streak_count = 1
+		streak_in_grace = false
+	else:
+		var last_unix: float = Time.get_unix_time_from_datetime_string(last_play_date)
+		var today_unix: float = Time.get_unix_time_from_datetime_string(today)
+		var days_diff: int = int(round((today_unix - last_unix) / 86400.0))
+		if days_diff == 1:
+			streak_count += 1
+			streak_in_grace = false
+		elif days_diff == 2:
+			# missed exactly one day — the streak survives, but flagged
+			# as having used its grace (shown dimmed rather than reset)
+			streak_in_grace = true
+		else:
+			streak_count = 1
+			streak_in_grace = false
+	last_play_date = today
+	save_progress()
+
 func save_progress() -> void:
-	var data := {"best_stars": best_stars}
+	var data := {
+		"best_stars": best_stars,
+		"streak_count": streak_count,
+		"last_play_date": last_play_date,
+		"streak_in_grace": streak_in_grace,
+	}
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file == null:
 		return
@@ -40,3 +76,6 @@ func load_progress() -> void:
 	for key in raw_stars.keys():
 		# JSON object keys are always strings; convert back to int level indices
 		best_stars[int(key)] = int(raw_stars[key])
+	streak_count = int(parsed.get("streak_count", 0))
+	last_play_date = String(parsed.get("last_play_date", ""))
+	streak_in_grace = bool(parsed.get("streak_in_grace", false))

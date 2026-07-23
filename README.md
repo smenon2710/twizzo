@@ -8,7 +8,7 @@ See [`Twizzo_Game_Plan.md`](./Twizzo_Game_Plan.md) for the full design vision
 (psychology principles, meta-progression, Play Store considerations, etc.).
 This README tracks what's actually been built so far.
 
-## Status: 5 levels, star rating, one power-up, and a level-select map
+## Status: 5 levels, star rating, one power-up, a level-select map, and a daily streak
 
 ### Implemented
 - **Aim & shoot** — mouse/touch aim clamped to an upward cone, with a live aim
@@ -18,11 +18,16 @@ This README tracks what's actually been built so far.
 - **Descending cluster** — the grid shifts down on a per-level timer for a
   fixed number of drops, then stops.
 - **Rainbow orb power-up** — ~12% of shots (a hidden, flat-probability
-  schedule) are a wildcard that joins the largest neighboring color group on
-  landing. A resting, unused wildcard always bridges into any future match
-  that touches it, so it can never get permanently stuck as dead weight.
-  Known open item: the exact join/behavior logic may need a rethink — see
-  the "pending" note below.
+  schedule) are a wildcard. On landing it's a universal wild: it pops
+  *every* distinct-color neighbor group that would reach 3+ once it joins
+  (not just the single largest — closer to genre convention, and it can
+  chain a multi-color combo). A resting, unused wildcard always bridges into
+  any future match that touches it, so it can never get permanently stuck
+  as dead weight.
+- **Daily streak** — consecutive calendar days played, with a 1-day grace
+  (missing exactly one day doesn't reset it, shown as a dimmed flame icon;
+  missing two or more resets it to 1). Shown on the level-select screen,
+  persisted alongside star progress.
 - **5 levels with a difficulty ramp**, each introducing at most one new
   difficulty dimension at a time:
 
@@ -72,18 +77,18 @@ has `mouse_filter = 2` (ignore) set explicitly. If a new tappable area is
 added later and silently doesn't respond to input, check this first.
 
 ### Pending / open items
-- **Rainbow orb logic** — flagged for a rethink; not yet revisited.
 - **Level gating** is a simple "previous level cleared" rule for now — no
   star-threshold gating like the game plan's later-chapter concept (Section
   6.1) yet.
 - Star-rating time thresholds are first-pass estimates, loosened generously
   after real playtesting on Levels 1-3; Levels 4-5 haven't been playtested
   against their thresholds yet.
-- Not yet implemented (see game plan Section 6/9/10): streaks, friends
-  leaderboard, shareable cards, chapter themes, Daily Challenge, Weekly
-  Gauntlet, Endless/Survival mode, and all Play Store readiness items (odds
-  disclosure, Data Safety, Families Policy decision, monetization model, AAB
-  packaging, offline verification).
+- Not yet implemented (see game plan Section 6/9/10): friends leaderboard,
+  shareable cards, chapter themes, Daily Challenge, Weekly Gauntlet,
+  Endless/Survival mode (next planned feature), and all Play Store readiness
+  items (odds disclosure — now actually relevant given the rainbow orb, Data
+  Safety, Families Policy decision, monetization model, AAB packaging,
+  offline verification).
 
 ## Project layout
 ```
@@ -99,9 +104,10 @@ scripts/
   text_button.gd         Reusable tap-target button (background chip + label)
   level_node.gd          One level-select map node: number, stars/lock state, tap-to-select
   level_select.gd        Level-select screen controller: unlock gating, navigation, exit
-  game_state.gd          Autoload: current level index, best stars, save/load to user://save.json
+  streak_display.gd      Drawn flame icon + count for the daily streak
+  game_state.gd          Autoload: level index, best stars, streak, save/load to user://save.json
 scenes/
-  orb.tscn, level_node.tscn, level_select.tscn, text_button.tscn
+  orb.tscn, level_node.tscn, level_select.tscn, text_button.tscn, streak_display.tscn
 Twizzo_Game_Plan.md      Original design document
 ```
 

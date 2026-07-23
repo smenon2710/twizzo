@@ -133,9 +133,12 @@ func flood_fill_color(start: Vector2i) -> Array[Vector2i]:
 	return group
 
 # Called only for the orb that was JUST placed, when it's the wildcard
-# itself — picks the largest same-color neighbor group to join and pop with.
+# itself. A universal wild: pops EVERY distinct-color neighbor group that
+# would reach 3+ once the wildcard joins it, not just the single largest —
+# closer to genre convention, and it can chain a satisfying multi-color
+# combo instead of arbitrarily picking one color over another.
 func flood_fill_from_wildcard(start: Vector2i) -> Array[Vector2i]:
-	var best_group: Array[Vector2i] = []
+	var combined: Dictionary = {}
 	var tried_colors := {}
 	for n in get_neighbors(start):
 		if not cells.has(n):
@@ -148,13 +151,20 @@ func flood_fill_from_wildcard(start: Vector2i) -> Array[Vector2i]:
 			continue
 		tried_colors[key] = true
 		var group := flood_fill_color(n)
-		if group.size() > best_group.size():
-			best_group = group
-	# flood_fill_color's own wildcard-bridging can already have swept the
-	# start cell back in from the other direction — don't double-count it
-	if not best_group.is_empty() and not best_group.has(start):
-		best_group.append(start)
-	return best_group
+		# flood_fill_color's own wildcard-bridging can re-discover `start`
+		# from the other direction — exclude it so a truly lone neighbor
+		# doesn't look like a qualifying pair just because of that bridge
+		group.erase(start)
+		if group.size() >= 2:
+			for c in group:
+				combined[c] = true
+	if combined.is_empty():
+		return []
+	combined[start] = true
+	var result: Array[Vector2i] = []
+	for c in combined.keys():
+		result.append(c)
+	return result
 
 func find_floating() -> Array[Vector2i]:
 	var visited := {}

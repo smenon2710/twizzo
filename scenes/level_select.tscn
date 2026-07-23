@@ -1,8 +1,9 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/level_select.gd" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/level_node.tscn" id="2"]
 [ext_resource type="PackedScene" path="res://scenes/text_button.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://scenes/streak_display.tscn" id="4"]
 
 [node name="LevelSelect" type="Node2D"]
 script = ExtResource("1")
@@ -61,3 +62,6 @@ position = Vector2(220, 940)
 position = Vector2(360, 1200)
 width = 140.0
 height = 46.0
+
+[node name="StreakDisplay" parent="." instance=ExtResource("4")]
+position = Vector2(630, 90)
