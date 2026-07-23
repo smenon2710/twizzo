@@ -61,15 +61,20 @@ func random_color() -> Color:
 	return COLORS[randi() % active_color_count]
 
 func random_color_in_play() -> Color:
-	if cells.is_empty():
+	var candidates: Array[Color] = []
+	for orb in cells.values():
+		if not orb.is_wildcard:
+			candidates.append(orb.color)
+	if candidates.is_empty():
 		return random_color()
-	var keys := cells.keys()
-	var pick: Vector2i = keys[randi() % keys.size()]
-	return cells[pick].color
+	return candidates[randi() % candidates.size()]
 
-func add_orb_at(coord: Vector2i, color: Color) -> Orb:
+func add_orb_at(coord: Vector2i, color: Color, wildcard: bool = false) -> Orb:
 	var orb: Orb = ORB_SCENE.instantiate()
-	orb.set_orb_color(color)
+	if wildcard:
+		orb.set_wildcard()
+	else:
+		orb.set_orb_color(color)
 	orb.position = grid_to_local(coord)
 	add_child(orb)
 	cells[coord] = orb
@@ -116,11 +121,40 @@ func flood_fill_color(start: Vector2i) -> Array[Vector2i]:
 	while not stack.is_empty():
 		var cur: Vector2i = stack.pop_back()
 		for n in get_neighbors(cur):
-			if cells.has(n) and not visited.has(n) and cells[n].color.is_equal_approx(target_color):
+			if not cells.has(n) or visited.has(n):
+				continue
+			var neighbor: Orb = cells[n]
+			# a resting wildcard always bridges into whatever color group
+			# touches it — keeps it from ever getting permanently stuck
+			if neighbor.is_wildcard or neighbor.color.is_equal_approx(target_color):
 				visited[n] = true
 				stack.append(n)
 				group.append(n)
 	return group
+
+# Called only for the orb that was JUST placed, when it's the wildcard
+# itself — picks the largest same-color neighbor group to join and pop with.
+func flood_fill_from_wildcard(start: Vector2i) -> Array[Vector2i]:
+	var best_group: Array[Vector2i] = []
+	var tried_colors := {}
+	for n in get_neighbors(start):
+		if not cells.has(n):
+			continue
+		var neighbor: Orb = cells[n]
+		if neighbor.is_wildcard:
+			continue
+		var key := neighbor.color.to_html()
+		if tried_colors.has(key):
+			continue
+		tried_colors[key] = true
+		var group := flood_fill_color(n)
+		if group.size() > best_group.size():
+			best_group = group
+	# flood_fill_color's own wildcard-bridging can already have swept the
+	# start cell back in from the other direction — don't double-count it
+	if not best_group.is_empty() and not best_group.has(start):
+		best_group.append(start)
+	return best_group
 
 func find_floating() -> Array[Vector2i]:
 	var visited := {}

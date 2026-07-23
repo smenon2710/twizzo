@@ -11,6 +11,7 @@ const ORB_RADIUS: float = 34.0
 var aim_dir: Vector2 = Vector2.UP
 var enabled: bool = true
 var loaded_color: Color = Color.WHITE
+var loaded_is_wildcard: bool = false
 
 func _process(_delta: float) -> void:
 	var target := get_global_mouse_position()
@@ -29,7 +30,10 @@ func _clamp_upward(dir: Vector2) -> Vector2:
 
 func _draw() -> void:
 	draw_circle(Vector2.ZERO, BASE_RADIUS, Color(0.15, 0.15, 0.2))
-	draw_circle(Vector2.ZERO, ORB_RADIUS, loaded_color)
+	if loaded_is_wildcard:
+		Orb.draw_wildcard_fill(self, ORB_RADIUS)
+	else:
+		draw_circle(Vector2.ZERO, ORB_RADIUS, loaded_color)
 	draw_arc(Vector2.ZERO, ORB_RADIUS - 2.5, 0.0, TAU, 32, Color(0.08, 0.08, 0.1), 5.0)
 	draw_circle(Vector2(-ORB_RADIUS * 0.32, -ORB_RADIUS * 0.32), ORB_RADIUS * 0.16, Color(1, 1, 1, 0.85))
 	var pointer_base := aim_dir * (ORB_RADIUS + 4.0)
