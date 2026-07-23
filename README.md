@@ -29,23 +29,32 @@ This README tracks what's actually been built so far.
   missing two or more resets it to 1). Shown on the level-select screen,
   persisted alongside star progress.
 - **5 levels with a difficulty ramp**, each introducing at most one new
-  difficulty dimension at a time:
+  difficulty dimension at a time — rebalanced after finding that Level 4 vs
+  3 had silently changed 4 variables at once (rows/shifts/interval/colors)
+  disguised as "just one more color," and Level 5 stacked the most orbs,
+  most colors, and least time-per-orb of any level simultaneously:
 
-  | Level | Rows | Colors | Drops | Interval | Endgame countdown | 3★ / 2★ time |
-  |-------|------|--------|-------|----------|--------------------|--------------|
-  | 1 | 2 | 3 | 2 | 7.0s | none — clear whenever | 50s / 80s |
-  | 2 | 4 | 3 | 5 | 8.0s | none — clear whenever | 80s / 125s |
-  | 3 | 4 | 3 | 5 | 7.0s | 26s | 35s / 50s |
-  | 4 | 5 | 4 | 6 | 6.5s | 20s | 32s / 48s |
-  | 5 | 5 | 5 | 7 | 6.0s | 15s | 30s / 45s |
+  | Level | Rows | Colors | Drops | Interval | Endgame countdown | 3★ / 2★ time | Orbs | Time/orb |
+  |-------|------|--------|-------|----------|--------------------|--------------|------|----------|
+  | 1 | 2 | 3 | 2 | 7.0s | none — clear whenever | 50s / 80s | 31 | — |
+  | 2 | 4 | 3 | 5 | 8.0s | none — clear whenever | 80s / 125s | 70 | — |
+  | 3 | 4 | 3 | 5 | 7.0s | 40s | 20s / 35s | 70 | 1.07s |
+  | 4 | 4 | 4 | 5 | 7.0s | 50s | 26s / 42s | 70 | 1.21s |
+  | 5 | 4 | 5 | 6 | 6.5s | 50s | 24s / 39s | 78 | 1.14s |
 
   Levels 1-2 are confidence-builders (no fail state once drops end). From
   Level 3 on, a countdown starts once drops end — clear the board before it
   hits zero or it's a loss. Clearing the last level loops back to Level 1.
+  "Time/orb" (hard time cap ÷ total orbs ever introduced) is the metric that
+  caught both imbalances and is the main sanity check for any future level.
 - **Star rating** — 1-3 stars based on total clear time (thresholds above).
   A live gauge (green → red) plus a paired star row sit just above the
   launcher throughout play, so the player can see in real time which rating
-  they're currently tracking toward, not just find out at the end.
+  they're currently tracking toward. Once the real endgame countdown starts,
+  the gauge swaps entirely for a separate circular "pie" gauge (`pie_gauge.gd`
+  — deliberately generic/reusable, no star-rating knowledge) draining toward
+  an actual loss, so the most prominent on-screen element always reflects
+  whichever is more urgent: star tier, or survival.
 - **Level-select map** — the game's actual entry point: 5 nodes on a simple
   zigzag path, each showing the level number and best-ever star rating.
   Levels 2+ are locked (padlock icon, dimmed) until the previous level has
@@ -74,6 +83,16 @@ This README tracks what's actually been built so far.
   earlier muted "ceramic bead" direction, which tested as too dull for a
   kid/young-audience target — see Section 10.3 of the game plan on audience
   and Families Policy considerations.
+- **Typography** — Fredoka (OFL-licensed, `assets/fonts/`) applied project-wide
+  via `gui/theme/custom_font`, replacing the engine's default bundled font.
+- **Sound** — procedurally synthesized, not downloaded files (`scripts/sfx.gd`,
+  an autoload): pop, shot, win, lose, and UI tap, all generated at boot as
+  `AudioStreamWAV` buffers from simple oscillator+envelope code. Consistent
+  with the rest of the project's "everything is code, zero external assets"
+  approach (except the font, which needs a real license to ship).
+- **"Juice"** — a colored particle burst on every pop, camera-shake scaled to
+  match size (and on a loss), a squash-stretch pop animation, and eased/
+  back-out tweens throughout instead of linear.
 - Configured for mobile: Forward Mobile renderer, 720×1280 portrait lock.
 
 ### Real bugs worth knowing about (fixed)
@@ -87,19 +106,52 @@ This README tracks what's actually been built so far.
   taps in `_unhandled_input` — a hidden button (e.g. Endless Mode before
   it's unlocked) would still fire if clicked in the right screen position.
   Fixed by guarding on `visible` at the top of the handler.
+- The rainbow orb's combo logic had a double-counting bug: a neighbor's own
+  flood-fill could re-discover the wildcard cell from the other direction,
+  making a truly lone neighbor look like a qualifying pair. Fixed by
+  excluding the origin cell from each candidate group's size check.
+- The falling-away animation (orbs cut off from the ceiling) faded them out
+  in sync with an ease-in position tween — since ease-in starts slow, the
+  orb was already half-transparent before it had visibly started moving,
+  reading as "fading in place" rather than falling. Fixed by delaying the
+  fade to start after the fall is already visible.
+- `shift_down()`'s drop animation tweened full `position` (x and y together).
+  Since this hex grid alternates a half-cell horizontal offset by row parity,
+  and every shift flips every orb's row parity, this made every drop animate
+  a diagonal zigzag (alternating rows sliding sideways in opposite
+  directions) instead of a clean vertical drop. Fixed by snapping x instantly
+  and only tweening y. Confirmed via a headless connectivity test that
+  `shift_down()` itself never produces a real disconnected orb (0 floaters
+  across 20 consecutive shifts) — the bug was purely visual, not a
+  connectivity/logic bug.
 
 ### Pending / open items
+- **Floating orbs during drops — NOT resolved.** The diagonal-zigzag fix
+  above was a real, confirmed bug, but the user reports still seeing
+  floating-looking orbs during drops after that fix. There is at least one
+  more unidentified contributing cause. Needs further investigation before
+  claiming this fixed — don't assume the zigzag fix was sufficient.
 - **Level gating** is a simple "previous level cleared" rule for now — no
   star-threshold gating like the game plan's later-chapter concept (Section
   6.1) yet.
-- Star-rating time thresholds are first-pass estimates, loosened generously
-  after real playtesting on Levels 1-3; Levels 4-5 haven't been playtested
-  against their thresholds yet.
+- Star-rating time thresholds are first-pass estimates. Levels 1-5 have real
+  playtest-driven adjustments now (including a full Level 4/5 rebalance —
+  see the level table above and its "Time/orb" column); nothing past Level 5
+  has been played.
 - **Not yet played by a human**: Endless Mode's difficulty curve (interval
   decay rate, starting size) is untested — only checked headlessly for
-  errors so far. The reworked rainbow-orb combo logic is verified with
-  isolated logic tests but not real gameplay feel either. Recommended next
-  step is playtesting both before adding more features.
+  errors so far. Recommended before adding more features there.
+- **Long-term level curve — designed but not built.** Current direction
+  (discussed and agreed, not yet implemented): move from a hand-authored
+  `LEVELS` array to a *formula* that generates each level's parameters from
+  its level number, targeting a 75-100 level game with colors capped/gated
+  by "world" tier (e.g. 3 colors through ~level 15, 4 through ~45, 5 through
+  ~85), periodic breather levels built into the curve's shape, and new
+  mechanics (bomb/ice orbs, obstacles, etc.) introduced per world — none of
+  which exist yet. A concrete data table for a Levels 6-10 "mini-arc"
+  (breather at 6, comfort-building 7-8, gentle tightening 9-10) was drafted
+  as a reference point but not implemented; the level-select screen also
+  only has 5 hand-placed nodes and doesn't yet support more.
 - Not yet implemented (see game plan Section 6/9/10): friends leaderboard,
   shareable cards, chapter themes, Daily Challenge, Weekly Gauntlet, and all
   Play Store readiness items (odds disclosure — now actually relevant given
@@ -117,15 +169,19 @@ scripts/
   orb.gd                 Self-drawn circle orb (no image assets); wildcard pie-wheel rendering
   star_display.gd        Small drawn 3-star row (used live during play and as the win result)
   star_gauge.gd          Draining green→red bar showing time left in the current star tier
+  pie_gauge.gd           Generic circular countdown (no star/level knowledge) — used once the
+                          real endgame countdown starts; reusable elsewhere later (e.g. Endless)
   text_button.gd         Reusable tap-target button (background chip + label)
   level_node.gd          One level-select map node: number, stars/lock state, tap-to-select
   level_select.gd        Level-select screen controller: unlock gating, navigation, exit
   streak_display.gd      Drawn flame icon + count for the daily streak
   endless.gd             Endless Mode: no fixed win, ever-accelerating descent, survival score
+  sfx.gd                 Autoload: procedurally synthesized SFX (no external audio files)
   game_state.gd          Autoload: level index, best stars, streak, endless best score, save/load
 scenes/
   orb.tscn, level_node.tscn, level_select.tscn, text_button.tscn, streak_display.tscn,
-  endless.tscn
+  endless.tscn, pie_gauge.tscn
+assets/fonts/Fredoka.ttf Project-wide UI font (OFL-licensed)
 Twizzo_Game_Plan.md      Original design document
 ```
 

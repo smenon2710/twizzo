@@ -12,16 +12,31 @@ const WILDCARD_CHANCE: float = 0.12
 # (0 = no countdown / no fail state, just clear it whenever). Each level
 # introduces at most one new difficulty dimension at a time: L1 is a quick
 # no-stakes tutorial, L2 adds volume, L3 adds the countdown (same colors as
-# L2), L4 adds a 4th color, L5 adds a 5th color alongside the tightest timer.
+# L2), L4 adds ONLY a 4th color (identical rows/shifts/interval/time-budget
+# to L3, so the harder-matching color count is isolated and gentle rather
+# than compounding with more content and less time at once — L4 used to
+# also bump rows/shifts/interval simultaneously, which was 4 difficulty
+# changes at once disguised as "just one more color" and felt like a
+# sudden spike), L5 is the finale and ramps rows/shifts/interval/colors/
+# timer together — the one place a bigger jump is intentional.
 # star3/star2: clear-time thresholds (seconds, from level start) for 3/2
 # stars; slower than star2 still earns 1 star. First-pass estimates —
 # expect to retune once there's real playtest data on clear times.
+#
+# For levels with a real endgame countdown (3-5), star2 is deliberately
+# set to equal shifts*interval (the exact moment drops stop) — that keeps
+# the "1-star floor" and "the real countdown begins" as the SAME moment,
+# so the story is a single clean line: beat star3 for 3★, beat star2
+# (=drops stopping) for 2★, and once you're in that final real-countdown
+# window you get exactly `endgame` more seconds to finish for 1★ or lose.
+# Before this, star2 fell partway through an already-running countdown on
+# every level, which had no clean answer to "how long do I actually have."
 const LEVELS: Array[Dictionary] = [
 	{"rows": 2, "colors": 3, "shifts": 2, "interval": 7.0, "endgame": 0.0, "star3": 50.0, "star2": 80.0},
 	{"rows": 4, "colors": 3, "shifts": 5, "interval": 8.0, "endgame": 0.0, "star3": 80.0, "star2": 125.0},
-	{"rows": 4, "colors": 3, "shifts": 5, "interval": 7.0, "endgame": 26.0, "star3": 35.0, "star2": 50.0},
-	{"rows": 5, "colors": 4, "shifts": 6, "interval": 6.5, "endgame": 20.0, "star3": 32.0, "star2": 48.0},
-	{"rows": 5, "colors": 5, "shifts": 7, "interval": 6.0, "endgame": 15.0, "star3": 30.0, "star2": 45.0},
+	{"rows": 4, "colors": 3, "shifts": 5, "interval": 7.0, "endgame": 40.0, "star3": 20.0, "star2": 35.0},
+	{"rows": 4, "colors": 4, "shifts": 5, "interval": 7.0, "endgame": 50.0, "star3": 26.0, "star2": 42.0},
+	{"rows": 4, "colors": 5, "shifts": 6, "interval": 6.5, "endgame": 50.0, "star3": 24.0, "star2": 39.0},
 ]
 
 enum State { PLAYING, WON, LOST }
@@ -32,9 +47,11 @@ enum State { PLAYING, WON, LOST }
 @onready var status_label: Label = $UI/StatusPanel/StatusLabel
 @onready var star_display: StarDisplay = $UI/StarDisplay
 @onready var star_gauge: StarGauge = $UI/StarGauge
+@onready var pie_gauge: PieGauge = $UI/PieGauge
 @onready var map_button: TextButton = $UI/MapButton
 @onready var shift_timer: Timer = $ShiftTimer
 @onready var lose_line: Line2D = $LoseLine
+@onready var camera: Camera2D = $Camera2D
 
 var state: State = State.PLAYING
 var shifts_remaining: int = 0
@@ -92,6 +109,16 @@ func _process(delta: float) -> void:
 func _update_star_gauge() -> void:
 	var level: Dictionary = LEVELS[GameState.level_index]
 	var elapsed: float = (Time.get_ticks_msec() - level_start_msec) / 1000.0
+	star_display.set_stars(_compute_stars(level, elapsed))
+	if in_endgame:
+		# real fail-state countdown is running — swap to the pie gauge
+		# entirely (a different shape, not just a recolored bar) so it
+		# reads unmistakably as a different kind of clock than star-tier
+		# progress: this one ending means losing, not a worse rating
+		star_gauge.hide_gauge()
+		var danger_fill: float = endgame_time_left / endgame_seconds if endgame_seconds > 0.0 else 0.0
+		pie_gauge.set_fill(danger_fill)
+		return
 	var star3: float = level["star3"]
 	var star2: float = level["star2"]
 	var fill: float
@@ -102,7 +129,6 @@ func _update_star_gauge() -> void:
 	else:
 		fill = 0.0
 	star_gauge.set_fill(fill)
-	star_display.set_stars(_compute_stars(level, elapsed))
 
 func _pick_next_shot() -> void:
 	next_is_wildcard = randf() < WILDCARD_CHANCE
@@ -116,6 +142,20 @@ func _pick_next_shot() -> void:
 func _position_lose_line() -> void:
 	var y: float = PlayField.TOP_MARGIN + PlayField.LOSE_ROW * PlayField.ROW_HEIGHT
 	lose_line.points = PackedVector2Array([Vector2(0, y), Vector2(playfield.board_width, y)])
+
+# Juice: a simple decaying camera-offset jitter — bigger matches (or a
+# loss) shake harder. Camera offset only (not position), so it never
+# drifts the launcher's aim math.
+func _shake_camera(strength: float, duration: float = 0.3) -> void:
+	if camera == null:
+		return
+	var tw := create_tween()
+	var steps: int = 6
+	for i in range(steps):
+		var decay: float = 1.0 - float(i) / float(steps)
+		var jitter := Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * strength * decay
+		tw.tween_property(camera, "offset", jitter, duration / steps).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.tween_property(camera, "offset", Vector2.ZERO, duration / steps)
 
 func _physics_process(delta: float) -> void:
 	if flying_orb == null:
@@ -143,6 +183,7 @@ func _settle_flying_orb() -> void:
 	var group: Array[Vector2i] = playfield.flood_fill_from_wildcard(coord) if was_wildcard else playfield.flood_fill_color(coord)
 	if group.size() >= 3:
 		playfield.remove_orbs(group)
+		_shake_camera(clampf(3.0 + float(group.size()) * 1.4, 3.0, 20.0), 0.28)
 		var floating := playfield.find_floating()
 		if not floating.is_empty():
 			playfield.remove_orbs(floating, true)
@@ -171,6 +212,7 @@ func _on_shift_timer_timeout() -> void:
 func _on_shoot_requested(direction: Vector2) -> void:
 	if state != State.PLAYING or flying_orb != null:
 		return
+	SFX.play_shot()
 	flying_orb = PlayField.ORB_SCENE.instantiate()
 	if next_is_wildcard:
 		flying_orb.set_wildcard()
@@ -187,7 +229,9 @@ func _end_game(won: bool, lose_reason: String = "") -> void:
 	shift_timer.stop()
 	in_endgame = false
 	star_gauge.hide_gauge()
+	pie_gauge.hide_gauge()
 	if won:
+		SFX.play_win()
 		var completed_index := GameState.level_index
 		var completed_level: Dictionary = LEVELS[completed_index]
 		var elapsed: float = (Time.get_ticks_msec() - level_start_msec) / 1000.0
@@ -203,6 +247,8 @@ func _end_game(won: bool, lose_reason: String = "") -> void:
 			status_label.text = "Level clear! Tap for Level %d" % (next_index + 1)
 		GameState.level_index = next_index
 	else:
+		SFX.play_lose()
+		_shake_camera(16.0, 0.35)
 		star_display.set_stars(0)
 		status_label.text = "%s. Tap to retry" % lose_reason
 

@@ -26,4 +26,5 @@ func _unhandled_input(event: InputEvent) -> void:
 	var pos: Vector2 = (event as InputEventMouseButton).position if event is InputEventMouseButton else (event as InputEventScreenTouch).position
 	var rect := Rect2(global_position - Vector2(width, height) / 2.0, Vector2(width, height))
 	if rect.has_point(pos):
+		SFX.play_tap()
 		pressed.emit()

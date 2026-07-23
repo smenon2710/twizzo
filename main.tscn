@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3 uid="uid://h0sf3642tlq8"]
+[gd_scene load_steps=8 format=3 uid="uid://h0sf3642tlq8"]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/playfield.gd" id="2"]
@@ -6,9 +6,14 @@
 [ext_resource type="Script" path="res://scripts/star_display.gd" id="4"]
 [ext_resource type="Script" path="res://scripts/star_gauge.gd" id="5"]
 [ext_resource type="PackedScene" path="res://scenes/text_button.tscn" id="6"]
+[ext_resource type="PackedScene" path="res://scenes/pie_gauge.tscn" id="7"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(360, 640)
+current = true
 
 [node name="Background" type="ColorRect" parent="."]
 mouse_filter = 2
@@ -78,3 +83,7 @@ script = ExtResource("4")
 position = Vector2(360, 1068)
 visible = false
 script = ExtResource("5")
+
+[node name="PieGauge" parent="UI" instance=ExtResource("7")]
+position = Vector2(360, 1068)
+visible = false

@@ -16,6 +16,7 @@ const INTERVAL_DECAY_PER_SHIFT: float = 0.15
 @onready var map_button: TextButton = $UI/MapButton
 @onready var shift_timer: Timer = $ShiftTimer
 @onready var lose_line: Line2D = $LoseLine
+@onready var camera: Camera2D = $Camera2D
 
 var alive: bool = true
 var flying_orb: Orb = null
@@ -45,6 +46,19 @@ func _ready() -> void:
 func _position_lose_line() -> void:
 	var y: float = PlayField.TOP_MARGIN + PlayField.LOSE_ROW * PlayField.ROW_HEIGHT
 	lose_line.points = PackedVector2Array([Vector2(0, y), Vector2(playfield.board_width, y)])
+
+# Juice: same decaying camera-offset jitter as the level mode — bigger
+# matches (or dying) shake harder. Offset-only, never touches aim math.
+func _shake_camera(strength: float, duration: float = 0.3) -> void:
+	if camera == null:
+		return
+	var tw := create_tween()
+	var steps: int = 6
+	for i in range(steps):
+		var decay: float = 1.0 - float(i) / float(steps)
+		var jitter := Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * strength * decay
+		tw.tween_property(camera, "offset", jitter, duration / steps).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.tween_property(camera, "offset", Vector2.ZERO, duration / steps)
 
 func _update_hud() -> void:
 	var elapsed: float = (Time.get_ticks_msec() - start_msec) / 1000.0
@@ -81,6 +95,7 @@ func _settle_flying_orb() -> void:
 	var group: Array[Vector2i] = playfield.flood_fill_from_wildcard(coord) if was_wildcard else playfield.flood_fill_color(coord)
 	if group.size() >= 3:
 		playfield.remove_orbs(group)
+		_shake_camera(clampf(3.0 + float(group.size()) * 1.4, 3.0, 20.0), 0.28)
 		var floating := playfield.find_floating()
 		if not floating.is_empty():
 			playfield.remove_orbs(floating, true)
@@ -108,6 +123,7 @@ func _pick_next_shot() -> void:
 func _on_shoot_requested(direction: Vector2) -> void:
 	if not alive or flying_orb != null:
 		return
+	SFX.play_shot()
 	flying_orb = PlayField.ORB_SCENE.instantiate()
 	if next_is_wildcard:
 		flying_orb.set_wildcard()
@@ -122,6 +138,8 @@ func _end_run() -> void:
 	alive = false
 	launcher.enabled = false
 	shift_timer.stop()
+	SFX.play_lose()
+	_shake_camera(16.0, 0.35)
 	var elapsed: float = (Time.get_ticks_msec() - start_msec) / 1000.0
 	var is_new_best: bool = elapsed > GameState.endless_best_score
 	if is_new_best:

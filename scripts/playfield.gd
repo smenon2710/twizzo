@@ -186,6 +186,12 @@ func find_floating() -> Array[Vector2i]:
 	return floating
 
 func remove_orbs(coords: Array, with_fall: bool = false) -> void:
+	if coords.is_empty():
+		return
+	if with_fall:
+		SFX.play_fall()
+	else:
+		SFX.play_pop(coords.size())
 	for c in coords:
 		if not cells.has(c):
 			continue
@@ -193,10 +199,23 @@ func remove_orbs(coords: Array, with_fall: bool = false) -> void:
 		cells.erase(c)
 		var tw := create_tween()
 		if with_fall:
+			# orbs left floating after a match tumble away — ease-in mimics
+			# gravity picking up speed rather than a flat linear drop.
+			# The fade is delayed so the orb stays visible while it's
+			# clearly dropping, then fades quickly near the end — fading
+			# in sync with the slow start of an ease-in position tween
+			# made it look like it was hovering in place, not falling.
+			tw.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 			tw.tween_property(orb, "position:y", orb.position.y + 500.0, 0.5)
-			tw.parallel().tween_property(orb, "modulate:a", 0.0, 0.5)
+			tw.parallel().tween_property(orb, "modulate:a", 0.0, 0.2).set_delay(0.3)
 		else:
-			tw.tween_property(orb, "scale", Vector2.ZERO, 0.15)
+			# actual match pop: a squash-stretch — a quick overshoot bump
+			# up in size, then a bouncy shrink to nothing — instead of the
+			# old flat linear scale-to-zero
+			_spawn_particle_burst(orb.position, orb.color if not orb.is_wildcard else Color(1, 1, 1))
+			tw.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			tw.tween_property(orb, "scale", Vector2(1.3, 1.3), 0.06)
+			tw.tween_property(orb, "scale", Vector2.ZERO, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 		tw.tween_callback(orb.queue_free)
 
 func shift_down() -> void:
@@ -206,10 +225,56 @@ func shift_down() -> void:
 		var new_c := Vector2i(c.x, c.y + 1)
 		var orb: Orb = old_cells[c]
 		cells[new_c] = orb
+		# every shift flips every orb's row parity (odd rows sit half a
+		# cell to the right in this offset hex grid), so a full position
+		# tween drags each orb sideways too — alternating rows visibly
+		# zigzag apart in opposite directions mid-slide, which read as
+		# pieces disconnecting/floating before snapping back together.
+		# Snap x instantly and only animate the vertical drop instead.
+		var target := grid_to_local(new_c)
+		orb.position.x = target.x
 		var tw := create_tween()
-		tw.tween_property(orb, "position", grid_to_local(new_c), 0.25)
+		tw.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_property(orb, "position:y", target.y, 0.25)
 	for col in range(0, max_col_for_row(0) + 1):
 		add_orb_at(Vector2i(col, 0), random_color())
+
+# ---- juice: particle burst ----
+
+static var _particle_texture: ImageTexture
+
+static func _get_particle_texture() -> ImageTexture:
+	if _particle_texture == null:
+		var img: Image = Image.create(12, 12, false, Image.FORMAT_RGBA8)
+		img.fill(Color(0, 0, 0, 0))
+		var center := Vector2(5.5, 5.5)
+		for y in range(12):
+			for x in range(12):
+				if Vector2(x, y).distance_to(center) <= 5.5:
+					img.set_pixel(x, y, Color(1, 1, 1, 1))
+		_particle_texture = ImageTexture.create_from_image(img)
+	return _particle_texture
+
+func _spawn_particle_burst(pos: Vector2, color: Color) -> void:
+	var particles := CPUParticles2D.new()
+	particles.position = pos
+	particles.texture = _get_particle_texture()
+	particles.emitting = false
+	particles.one_shot = true
+	particles.amount = 10
+	particles.lifetime = 0.4
+	particles.explosiveness = 1.0
+	particles.direction = Vector2.UP
+	particles.spread = 180.0
+	particles.gravity = Vector2(0, 420.0)
+	particles.initial_velocity_min = 80.0
+	particles.initial_velocity_max = 210.0
+	particles.scale_amount_min = 0.35
+	particles.scale_amount_max = 0.65
+	particles.color = color
+	add_child(particles)
+	particles.finished.connect(particles.queue_free)
+	particles.emitting = true
 
 func has_lost() -> bool:
 	for c in cells.keys():
