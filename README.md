@@ -8,7 +8,7 @@ See [`Twizzo_Game_Plan.md`](./Twizzo_Game_Plan.md) for the full design vision
 (psychology principles, meta-progression, Play Store considerations, etc.).
 This README tracks what's actually been built so far.
 
-## Status: 5 levels, star rating, one power-up, a level-select map, and a daily streak
+## Status: 5 levels, star rating, one power-up, a level-select map, a daily streak, and Endless Mode
 
 ### Implemented
 - **Aim & shoot** — mouse/touch aim clamped to an upward cone, with a live aim
@@ -50,8 +50,16 @@ This README tracks what's actually been built so far.
   zigzag path, each showing the level number and best-ever star rating.
   Levels 2+ are locked (padlock icon, dimmed) until the previous level has
   been cleared at least once.
-- **Save persistence** — best star ratings (and therefore unlock state) are
-  written to `user://save.json` on every level clear and reloaded on launch.
+- **Endless Mode** — unlocked once Level 5 has been cleared once; a separate
+  scene (own script, reuses `PlayField`/`Launcher`/`Orb`/`TextButton`) with
+  no fixed win condition. Starts small (3 rows, all 5 colors) and the
+  cluster just keeps descending forever, with the interval between drops
+  shrinking each time (6.0s down to a floor of 1.8s). Score is survival
+  time; best run persists and a "NEW BEST!" callout shows on a new record.
+  Built as its own scene rather than branching `main.gd`'s level-mode logic.
+- **Save persistence** — best star ratings (and therefore unlock state),
+  daily streak, and Endless Mode's best score are all written to
+  `user://save.json` on every relevant event and reloaded on launch.
 - **Navigation** — a "< MAP" button is visible throughout every level (not
   just at the end) to bail back to the level-select screen at any time; the
   level-select screen has an "EXIT" button that quits the app.
@@ -68,13 +76,17 @@ This README tracks what's actually been built so far.
   and Families Policy considerations.
 - Configured for mobile: Forward Mobile renderer, 720×1280 portrait lock.
 
-### A real bug worth knowing about (fixed)
-Godot `Control` nodes (labels, color rects used as panels) intercept clicks
-via the engine's GUI input system by default, *before* `_unhandled_input`
-ever sees them — which is what every custom button/input handler in this
-project relies on. Every purely-visual `Control` across all three scenes now
-has `mouse_filter = 2` (ignore) set explicitly. If a new tappable area is
-added later and silently doesn't respond to input, check this first.
+### Real bugs worth knowing about (fixed)
+- Godot `Control` nodes (labels, color rects used as panels) intercept clicks
+  via the engine's GUI input system by default, *before* `_unhandled_input`
+  ever sees them — which is what every custom button/input handler in this
+  project relies on. Every purely-visual `Control` has `mouse_filter = 2`
+  (ignore) set explicitly. If a new tappable area is added later and
+  silently doesn't respond to input, check this first.
+- `TextButton` didn't check its own `visible` state before responding to
+  taps in `_unhandled_input` — a hidden button (e.g. Endless Mode before
+  it's unlocked) would still fire if clicked in the right screen position.
+  Fixed by guarding on `visible` at the top of the handler.
 
 ### Pending / open items
 - **Level gating** is a simple "previous level cleared" rule for now — no
@@ -83,12 +95,16 @@ added later and silently doesn't respond to input, check this first.
 - Star-rating time thresholds are first-pass estimates, loosened generously
   after real playtesting on Levels 1-3; Levels 4-5 haven't been playtested
   against their thresholds yet.
+- **Not yet played by a human**: Endless Mode's difficulty curve (interval
+  decay rate, starting size) is untested — only checked headlessly for
+  errors so far. The reworked rainbow-orb combo logic is verified with
+  isolated logic tests but not real gameplay feel either. Recommended next
+  step is playtesting both before adding more features.
 - Not yet implemented (see game plan Section 6/9/10): friends leaderboard,
-  shareable cards, chapter themes, Daily Challenge, Weekly Gauntlet,
-  Endless/Survival mode (next planned feature), and all Play Store readiness
-  items (odds disclosure — now actually relevant given the rainbow orb, Data
-  Safety, Families Policy decision, monetization model, AAB packaging,
-  offline verification).
+  shareable cards, chapter themes, Daily Challenge, Weekly Gauntlet, and all
+  Play Store readiness items (odds disclosure — now actually relevant given
+  the rainbow orb, Data Safety, Families Policy decision, monetization
+  model, AAB packaging, offline verification).
 
 ## Project layout
 ```
@@ -105,9 +121,11 @@ scripts/
   level_node.gd          One level-select map node: number, stars/lock state, tap-to-select
   level_select.gd        Level-select screen controller: unlock gating, navigation, exit
   streak_display.gd      Drawn flame icon + count for the daily streak
-  game_state.gd          Autoload: level index, best stars, streak, save/load to user://save.json
+  endless.gd             Endless Mode: no fixed win, ever-accelerating descent, survival score
+  game_state.gd          Autoload: level index, best stars, streak, endless best score, save/load
 scenes/
-  orb.tscn, level_node.tscn, level_select.tscn, text_button.tscn, streak_display.tscn
+  orb.tscn, level_node.tscn, level_select.tscn, text_button.tscn, streak_display.tscn,
+  endless.tscn
 Twizzo_Game_Plan.md      Original design document
 ```
 

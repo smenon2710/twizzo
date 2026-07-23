@@ -14,6 +14,11 @@ var streak_count: int = 0
 var last_play_date: String = ""
 var streak_in_grace: bool = false
 
+# Endless mode: unlocked once every base level has been cleared at least
+# once. Best survival time (seconds) persists like everything else.
+const ENDLESS_UNLOCK_LEVEL: int = 4
+var endless_best_score: float = 0.0
+
 func _ready() -> void:
 	load_progress()
 	_update_streak()
@@ -22,6 +27,9 @@ func is_level_unlocked(index: int) -> bool:
 	if index == 0:
 		return true
 	return best_stars.has(index - 1)
+
+func is_endless_unlocked() -> bool:
+	return best_stars.has(ENDLESS_UNLOCK_LEVEL)
 
 func _update_streak() -> void:
 	var today: String = Time.get_date_string_from_system()
@@ -53,6 +61,7 @@ func save_progress() -> void:
 		"streak_count": streak_count,
 		"last_play_date": last_play_date,
 		"streak_in_grace": streak_in_grace,
+		"endless_best_score": endless_best_score,
 	}
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file == null:
@@ -79,3 +88,4 @@ func load_progress() -> void:
 	streak_count = int(parsed.get("streak_count", 0))
 	last_play_date = String(parsed.get("last_play_date", ""))
 	streak_in_grace = bool(parsed.get("streak_in_grace", false))
+	endless_best_score = float(parsed.get("endless_best_score", 0.0))

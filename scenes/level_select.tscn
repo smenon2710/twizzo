@@ -58,6 +58,11 @@ position = Vector2(520, 760)
 [node name="LevelNode5" parent="." instance=ExtResource("2")]
 position = Vector2(220, 940)
 
+[node name="EndlessButton" parent="." instance=ExtResource("3")]
+position = Vector2(360, 1080)
+width = 220.0
+height = 50.0
+
 [node name="ExitButton" parent="." instance=ExtResource("3")]
 position = Vector2(360, 1200)
 width = 140.0

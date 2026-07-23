@@ -17,6 +17,8 @@ func _draw() -> void:
 	draw_rect(rect, Color(0.08, 0.08, 0.1), false, 4.0)
 
 func _unhandled_input(event: InputEvent) -> void:
+	if not visible:
+		return
 	var is_pressed: bool = (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT) \
 		or (event is InputEventScreenTouch and event.pressed)
 	if not is_pressed:
